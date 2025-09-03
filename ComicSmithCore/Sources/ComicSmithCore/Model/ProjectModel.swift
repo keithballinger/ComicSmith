@@ -129,6 +129,11 @@ public final class ModelController {
         model.pages[index] = page
         bumpVersion()
     }
+    
+    public func replaceModel(_ newModel: Issue) {
+        model = newModel
+        bumpVersion()
+    }
 
     // MARK: - Page ops
     public func addPanel(pageID: String, index: Int?, description: String?) throws -> Panel {

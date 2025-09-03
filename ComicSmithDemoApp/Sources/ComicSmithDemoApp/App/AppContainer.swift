@@ -18,14 +18,17 @@ final class AppContainer: ObservableObject {
     let orchestrator: ChatOrchestrator
     
     // For autosaving
-    private let persistenceService: PersistenceService
+    private var persistenceService: PersistenceService
     private let autosaveDebouncer = Debouncer(delay: 2.0)
+    private var currentProjectURL: URL
+    private let keychainService = KeychainService()
 
     init() {
         // --- Persistence Setup ---
         let fileManager = FileManager.default
         let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let projectURL = appSupportURL.appendingPathComponent("ComicSmithDemoProject")
+        self.currentProjectURL = projectURL
         self.persistenceService = PersistenceService(projectRoot: projectURL, fileManager: fileManager)
 
         // --- Model Setup ---
@@ -42,10 +45,19 @@ final class AppContainer: ObservableObject {
         self.controller.references = loadedModel.references
 
         // --- Core Services Setup ---
-        let apiKey = "YOUR_GEMINI_API_KEY" // TODO: Replace with a real key
+        // Try to load API key from Keychain, fall back to placeholder
+        let apiKey: String
+        do {
+            apiKey = try keychainService.getAPIKey(for: "gemini")
+            print("Loaded Gemini API key from Keychain")
+        } catch {
+            apiKey = "YOUR_GEMINI_API_KEY" // Placeholder - user needs to set this
+            print("No API key in Keychain, using placeholder")
+        }
+        
         self.registry = ToolRegistry()
         registerAllTools(into: registry)
-        let textClient = RealGeminiClient(apiKey: apiKey)
+        let textClient = RealGeminiClient(apiKey: apiKey, temperature: 0.7)
         self.orchestrator = ChatOrchestrator(client: textClient, registry: registry, controller: controller)
         self.images = ImageGenQueue(modelController: self.controller, apiKey: apiKey)
         
@@ -152,5 +164,96 @@ final class AppContainer: ObservableObject {
     
     func enqueueReferenceImage(referenceID: String) {
         images.enqueueReferenceImage(referenceID: referenceID)
+    }
+    
+    // MARK: - File Management
+    
+    func newProject() {
+        // Create new empty project
+        controller.replaceModel(Issue(title: "New Issue"))
+        controller.references = []
+        controller.mode = .issue
+        controller.focus = Focus()
+        
+        // Update UI
+        refresh()
+        
+        // Trigger save to new location
+        autosaveDebouncer.debounce { [weak self] in
+            self?.saveCurrentProject()
+        }
+    }
+    
+    func openProject(at url: URL) {
+        do {
+            // Update persistence service to new location
+            let newPersistence = PersistenceService(projectRoot: url)
+            let (loadedIssue, loadedReferences) = try newPersistence.load()
+            
+            // Update model
+            controller.replaceModel(loadedIssue)
+            controller.references = loadedReferences
+            controller.mode = .issue
+            controller.focus = Focus()
+            
+            // Update persistence
+            self.persistenceService = newPersistence
+            self.currentProjectURL = url
+            
+            // Update UI
+            refresh()
+            
+            print("Opened project from \(url.path)")
+        } catch {
+            print("Failed to open project: \(error)")
+        }
+    }
+    
+    func saveProject() {
+        saveCurrentProject()
+    }
+    
+    func saveProjectAs(to url: URL) {
+        do {
+            // Create new persistence service at new location
+            let newPersistence = PersistenceService(projectRoot: url)
+            try newPersistence.save(issue: controller.model, references: controller.references)
+            
+            // Update to use new location
+            self.persistenceService = newPersistence
+            self.currentProjectURL = url
+            
+            print("Saved project to new location: \(url.path)")
+        } catch {
+            print("Failed to save project as: \(error)")
+        }
+    }
+    
+    private func saveCurrentProject() {
+        do {
+            try persistenceService.save(issue: controller.model, references: controller.references)
+            print("Saved project to \(currentProjectURL.path)")
+        } catch {
+            print("Failed to save project: \(error)")
+        }
+    }
+    
+    // MARK: - API Key Management
+    
+    func setAPIKey(_ apiKey: String, for service: String = "gemini") throws {
+        try keychainService.saveAPIKey(apiKey, for: service)
+        
+        // Reinitialize services with new API key
+        let textClient = RealGeminiClient(apiKey: apiKey, temperature: 0.7)
+        // Note: We'd need to make orchestrator mutable or recreate it
+        // For now, this requires app restart to take effect
+    }
+    
+    func getAPIKey(for service: String = "gemini") throws -> String {
+        return try keychainService.getAPIKey(for: service)
+    }
+    
+    func hasAPIKey(for service: String = "gemini") -> Bool {
+        return keychainService.hasAPIKey(for: service)
     }
 }

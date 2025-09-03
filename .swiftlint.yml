@@ -1,0 +1,42 @@
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - explicit_init
+  - explicit_type_interface
+  - fatal_error_message
+  - file_header
+  - first_where
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  - nimble_operator
+  - operator_usage_whitespace
+  - overridden_super_call
+  - private_outlet
+  - prohibited_super_call
+  - redundant_nil_coalescing
+  - sorted_imports
+  - switch_case_on_newline
+  - trailing_closure
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - function_body_length
+  - type_body_length
+  - file_length
+  - cyclomatic_complexity
+  - function_parameter_count
+  - type_name
+  - identifier_name
+included:
+  - ComicSmithCore
+  - ComicSmithDemoApp
+excluded:
+  - Carthage
+  - Pods
+  - .build
+analyzer_rules:
+  - unused_declaration
+  - unused_import

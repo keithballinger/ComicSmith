@@ -28,6 +28,26 @@ public struct APIRequest: Codable {
     public let tools: [APITool]
 }
 
+public struct APIRequestWithConfig: Codable {
+    public let contents: [APIContent]
+    public let tools: [APITool]
+    public let generationConfig: GenerationConfig?
+}
+
+public struct GenerationConfig: Codable {
+    public let temperature: Double?
+    public let maxOutputTokens: Int?
+    public let topK: Int?
+    public let topP: Double?
+    
+    public init(temperature: Double? = nil, maxOutputTokens: Int? = nil, topK: Int? = nil, topP: Double? = nil) {
+        self.temperature = temperature
+        self.maxOutputTokens = maxOutputTokens
+        self.topK = topK
+        self.topP = topP
+    }
+}
+
 public struct APIContent: Codable {
     public let role: String // "user" or "model"
     public let parts: [APIPart]
